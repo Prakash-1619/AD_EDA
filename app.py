@@ -74,6 +74,7 @@ elif len(selected_dates) == 1:
     df = df[df['Sale Application Date'].dt.date >= start_date]
 
 # ==========================================
+# ==========================================
 # SIDEBAR: DYNAMIC OUTLIERS
 # ==========================================
 st.sidebar.subheader("1. Outlier Configuration")
@@ -83,6 +84,14 @@ outlier_scope = st.sidebar.radio(
     ["None (Keep All Data)", "Overall Data (Before Filters)", "Filtered Data (After Filters)"],
     index=0,
     help="None bypasses outliers. Overall applies rules globally. Filtered applies rules only to the data left after your category selections."
+)
+
+# NEW: Categorical grouping for outliers
+outlier_grouping = st.sidebar.multiselect(
+    "Calculate Outliers Within Categories (Optional):",
+    options=filter_columns,
+    default=[],
+    help="Select categories to group by. E.g., Selecting 'Property Type' calculates the 99th percentile separately for Apartments, Villas, etc. You can select multiple."
 )
 
 outlier_bounds = {}
@@ -96,9 +105,19 @@ for col in num_cols:
 def apply_outliers(data):
     d = data.copy()
     for col, (low, high) in outlier_bounds.items():
-        l_val = d[col].quantile(low)
-        h_val = d[col].quantile(high)
-        d = d[(d[col] >= l_val) & (d[col] <= h_val)]
+        if outlier_grouping:
+            # Grouped outlier calculation using .transform()
+            # This calculates the exact percentile for EACH specific category group
+            q_low = d.groupby(outlier_grouping)[col].transform(lambda x: x.quantile(low))
+            q_high = d.groupby(outlier_grouping)[col].transform(lambda x: x.quantile(high))
+            
+            # Keep rows that fall within their specific category's bounds
+            d = d[(d[col] >= q_low) & (d[col] <= q_high)]
+        else:
+            # Standard Global outlier calculation
+            l_val = d[col].quantile(low)
+            h_val = d[col].quantile(high)
+            d = d[(d[col] >= l_val) & (d[col] <= h_val)]
     return d
 
 if outlier_scope == "Overall Data (Before Filters)":
