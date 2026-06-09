@@ -305,56 +305,63 @@ if not df.empty:
             st.success("✅ There are zero missing values in the currently selected data slice!")
 
     # ==========================================
-    # TAB 7: RECENT TRANSACTIONS
+    # TAB 7: FIRST TRANSACTIONS
     # ==========================================
     with tab7:
-        st.subheader("Recent Transactions Analysis")
-        st.markdown("Analyze the most recent transactions recorded for specific categories (e.g., the last N recorded sales in each District or Community).")
+        st.subheader("First Transactions Analysis")
+        st.markdown("Find the **very first (oldest) transaction** ever recorded for every category, and display the top newest ones among them.")
         
         # Selectors for Category and N-Recent
         rt_col1, rt_col2 = st.columns(2)
         with rt_col1:
             recent_col = st.selectbox("Group by (Category):", filter_columns, index=0)
         with rt_col2:
-            n_recent = st.selectbox("Number of recent transactions per category (N):", [1, 5, 10, 20, 50], index=1)
+            limit_n_str = st.selectbox("Show Top N Newest Among Them:", ["5", "10", "20", "50", "All"], index=1)
         
         if 'Sale Application Date' in df.columns:
-            # Sort by Date descending, group by category, and take the top N rows
-            recent_df = df.sort_values(by='Sale Application Date', ascending=False).groupby(recent_col).head(n_recent)
+            # 1. Sort by Date ASCENDING (Oldest to Newest)
+            # 2. Drop duplicates to keep ONLY the very first (oldest) transaction per category
+            first_df = df.sort_values(by='Sale Application Date', ascending=True).drop_duplicates(subset=[recent_col], keep='first')
             
+            # 3. Sort the resulting "first transactions" by Date DESCENDING (Newest to Oldest) 
+            #    so you can see the most recent of these first transactions.
+            first_df = first_df.sort_values(by='Sale Application Date', ascending=False)
+            
+            # 4. Apply the Top N limit to the resulting list
+            if limit_n_str != "All":
+                first_df = first_df.head(int(limit_n_str))
+                
             # --- 1. Time Plot Visualization ---
             if 'Rate (AED per SQM)' in df.columns:
-                st.markdown(f"**Timeline of the Last {n_recent} Transactions per {recent_col}**")
+                st.markdown(f"**Timeline of the First-Ever '{recent_col}' Sales**")
                 
-                # Create a scatter plot to show when these recent transactions happened and their rates
-                fig_recent_time = px.scatter(
-                    recent_df, 
+                # Create a scatter plot to show when these first transactions happened
+                fig_first_time = px.scatter(
+                    first_df, 
                     x='Sale Application Date', 
                     y='Rate (AED per SQM)', 
                     color=recent_col,
                     hover_data=['Property Sale Price (AED)', 'Property Sold Area (SQM)', 'Property Type'],
-                    title=f"Recent Transactions Timeline: {recent_col} vs Rate",
+                    title=f"First Transaction Recorded per {recent_col}",
                     opacity=0.8
                 )
                 
-                # Increase marker size for better visibility
-                fig_recent_time.update_traces(marker=dict(size=10, line=dict(width=1, color='DarkSlateGrey')))
-                st.plotly_chart(fig_recent_time, use_container_width=True)
+                # Increase marker size
+                fig_first_time.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
+                st.plotly_chart(fig_first_time, use_container_width=True)
             
             # --- 2. Data Table ---
-            st.markdown(f"**Detailed Data: Latest {n_recent} transactions for every unique {recent_col}**")
+            st.markdown(f"**Detailed Data: First transaction details for the selected '{recent_col}'**")
             
             # Select columns to display
             display_cols = [recent_col, 'Sale Application Date'] + [c for c in ['Property Sale Price (AED)', 'Rate (AED per SQM)', 'Property Type', 'Sale Sequence'] if c in df.columns]
             
-            # Show the table, sorted by the selected category (alphabetical) and then by Date (descending)
+            # Show the table
             st.dataframe(
-                recent_df[display_cols]
-                .sort_values(by=[recent_col, 'Sale Application Date'], ascending=[True, False])
-                .reset_index(drop=True)
+                first_df[display_cols].reset_index(drop=True)
             )
         else:
-            st.warning("Cannot find 'Sale Application Date' column to calculate recency.")
+            st.warning("Cannot find 'Sale Application Date' column to calculate the first transactions.")
     # ==========================================
     # TAB 8: DATA & SUMMARY
     # ==========================================
