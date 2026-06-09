@@ -215,7 +215,7 @@ if not df.empty:
         if num_cols and filter_columns:
             r_col1, r_col2, r_col3, r_col4 = st.columns(4)
             with r_col1:
-                x_axis = st.selectbox("X-Axis", num_cols, index=0)
+                x_axis = st.selectbox("X-Axis", filter_columns, index=0)
             with r_col2:
                 y_axis = st.selectbox("Y-Axis", num_cols, index=1 if len(num_cols) > 1 else 0)
             with r_col3:
