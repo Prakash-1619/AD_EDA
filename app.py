@@ -86,10 +86,10 @@ for col in all_filter_cols:
 # ==========================================
 def render_dashboard(df_active, df_raw_ref, num_cols, filter_cols, is_view_1):
     # Top-Line Metrics
-    col1, col2,  = st.columns(2) # col3, col4
+    col1, col2 = st.columns(2) # col3, col4
     col1.metric("Total Transactions", f"{len(df_active):,}")
     if 'Property Sale Price (AED)' in df_active.columns:
-        col4.metric("Total Market Value", f"AED {df_active['Property Sale Price (AED)'].sum() / 1e9:,.2f} B")
+        col2.metric("Total Market Value", f"AED {df_active['Property Sale Price (AED)'].sum() / 1e9:,.2f} B")
 
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📋 Summary Profile", "📈 Trends", "📊 Distributions", "🗺️ District Map", "🧩 Correlations", "🕒 First Transactions", "🔗 Relationships", "📋 Raw Snapshot"
