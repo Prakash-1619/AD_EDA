@@ -315,7 +315,7 @@ def render_dashboard(df_active, df_raw_ref, num_cols, filter_cols, is_view_1):
 if df_base.empty:
     st.warning("⚠️ No records match your current Date and Sidebar Filters.")
 else:
-    if "Main View 1" in view_mode:
+    if "Abu Dhabi Real Estate" in view_mode:
         st.title("Abu Dhabi Real Estate")
         st.markdown("Automated standard hygiene applied: 1% & 99% quantiles removed for precise property evaluation.")
         
@@ -347,7 +347,7 @@ else:
         # 4. Render Dashboard
         render_dashboard(df_active, df_base, num_cols_v1, all_filter_cols, is_view_1=True)
 
-    elif "Main View 2" in view_mode:
+    elif "Dynamic EDA" in view_mode:
         st.title("Dynamic filteration EDA")
         
         # 1. Show Dynamic Outliers Sidebar (Only in View 2)
