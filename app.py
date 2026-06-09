@@ -50,7 +50,7 @@ all_filter_cols = [col for col in cat_cols if col not in ['Sale Application Date
 # ==========================================
 # SIDEBAR: MASTER VIEW TOGGLE
 # ==========================================
-st.sidebar.title("👁️ Dashboard Mode")
+#st.sidebar.title("👁️ Dashboard Mode")
 view_mode = st.sidebar.radio(
     "Select Operating View:",
     ["Abu Dhabi Real Estate", "Dynamic EDA"],
@@ -336,7 +336,7 @@ else:
             df_v1_clean = df_v1_clean[(df_v1_clean['Rate (AED per SQM)'] >= rate_low) & (df_v1_clean['Rate (AED per SQM)'] <= rate_high)]
 
         # 3. View 1 "Before/After" Interactive Toggle
-        data_state = st.radio(
+        data_state = st.sidebar.radio(
             "Toggle Data State for Dashboard:", 
             ["Cleaned Data (Auto-Outliers Removed)", "Raw Data (Before Outlier Cleaning)"], 
             horizontal=True
