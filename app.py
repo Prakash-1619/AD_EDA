@@ -305,29 +305,56 @@ if not df.empty:
             st.success("✅ There are zero missing values in the currently selected data slice!")
 
     # ==========================================
-    # TAB 7: RECENT TRANSACTIONS (New Tab)
+    # TAB 7: RECENT TRANSACTIONS
     # ==========================================
     with tab7:
-        st.subheader("Most Recent Transactions")
-        st.markdown("Identify the latest transaction recorded for specific categories (e.g., the last recorded sale in each District or Community).")
+        st.subheader("Recent Transactions Analysis")
+        st.markdown("Analyze the most recent transactions recorded for specific categories (e.g., the last N recorded sales in each District or Community).")
         
-        recent_col = st.selectbox("Find latest transaction per:", filter_columns, index=0)
+        # Selectors for Category and N-Recent
+        rt_col1, rt_col2 = st.columns(2)
+        with rt_col1:
+            recent_col = st.selectbox("Group by (Category):", filter_columns, index=0)
+        with rt_col2:
+            n_recent = st.selectbox("Number of recent transactions per category (N):", [1, 5, 10, 20, 50], index=1)
         
         if 'Sale Application Date' in df.columns:
-            # Sort by Date descending, then drop duplicates keeping the first occurrence (which is the most recent)
-            recent_df = df.sort_values(by='Sale Application Date', ascending=False).drop_duplicates(subset=[recent_col], keep='first')
+            # Sort by Date descending, group by category, and take the top N rows
+            recent_df = df.sort_values(by='Sale Application Date', ascending=False).groupby(recent_col).head(n_recent)
             
-            # Formatting the table for readability
-            st.markdown(f"**Latest transaction mapping for every unique {recent_col}**:")
+            # --- 1. Time Plot Visualization ---
+            if 'Rate (AED per SQM)' in df.columns:
+                st.markdown(f"**Timeline of the Last {n_recent} Transactions per {recent_col}**")
+                
+                # Create a scatter plot to show when these recent transactions happened and their rates
+                fig_recent_time = px.scatter(
+                    recent_df, 
+                    x='Sale Application Date', 
+                    y='Rate (AED per SQM)', 
+                    color=recent_col,
+                    hover_data=['Property Sale Price (AED)', 'Property Sold Area (SQM)', 'Property Type'],
+                    title=f"Recent Transactions Timeline: {recent_col} vs Rate",
+                    opacity=0.8
+                )
+                
+                # Increase marker size for better visibility
+                fig_recent_time.update_traces(marker=dict(size=10, line=dict(width=1, color='DarkSlateGrey')))
+                st.plotly_chart(fig_recent_time, use_container_width=True)
             
-            # Select columns to display so the table isn't overwhelmingly wide
+            # --- 2. Data Table ---
+            st.markdown(f"**Detailed Data: Latest {n_recent} transactions for every unique {recent_col}**")
+            
+            # Select columns to display
             display_cols = [recent_col, 'Sale Application Date'] + [c for c in ['Property Sale Price (AED)', 'Rate (AED per SQM)', 'Property Type', 'Sale Sequence'] if c in df.columns]
             
-            # Show the table, sorted alphabetically by the selected category for ease of reading
-            st.dataframe(recent_df[display_cols].sort_values(by=recent_col).reset_index(drop=True))
+            # Show the table, sorted by the selected category (alphabetical) and then by Date (descending)
+            st.dataframe(
+                recent_df[display_cols]
+                .sort_values(by=[recent_col, 'Sale Application Date'], ascending=[True, False])
+                .reset_index(drop=True)
+            )
         else:
             st.warning("Cannot find 'Sale Application Date' column to calculate recency.")
-
     # ==========================================
     # TAB 8: DATA & SUMMARY
     # ==========================================
