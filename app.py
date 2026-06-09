@@ -269,11 +269,36 @@ if not df.empty:
         st.subheader("Geographical Distribution")
         if 'District' in df.columns and 'Rate (AED per SQM)' in df.columns:
             coord_mapping = {
-                'Yas Island': {'lat': 24.496, 'lon': 54.603},
                 'Al Reem Island': {'lat': 24.494, 'lon': 54.406},
+                'Yas Island': {'lat': 24.496, 'lon': 54.603},
+                'Al Saadiyat Island': {'lat': 24.539, 'lon': 54.437},
+                'Al Maryah Island': {'lat': 24.502, 'lon': 54.389},
                 'Al Rahah': {'lat': 24.437, 'lon': 54.582},
+                'Khalifa City': {'lat': 24.417, 'lon': 54.583},
+                'Al Reef': {'lat': 24.463, 'lon': 54.654},
+                'Mohamed Bin Zayed City': {'lat': 24.348, 'lon': 54.549},
+                'Al Shamkhah': {'lat': 24.394, 'lon': 54.717},
+                'Bani Yas': {'lat': 24.305, 'lon': 54.625},
+                'Zayed City': {'lat': 23.655, 'lon': 53.704},
+                'Al Shahamah': {'lat': 24.531, 'lon': 54.685},
+                'Al Bahyah': {'lat': 24.551, 'lon': 54.654},
+                'Ramhan Island': {'lat': 24.501, 'lon': 54.501},
+                'Fahid Island': {'lat': 24.512, 'lon': 54.536},
+                'Al Jubail Island': {'lat': 24.542, 'lon': 54.485},
+                'Al Bateen': {'lat': 24.453, 'lon': 54.345},
+                'Al Khalidiyah': {'lat': 24.471, 'lon': 54.341},
+                'Al Nahyan': {'lat': 24.475, 'lon': 54.381},
+                'Al Mushrif': {'lat': 24.448, 'lon': 54.395},
+                'Musaffah': {'lat': 24.356, 'lon': 54.515},
                 'Ghayathi': {'lat': 23.844, 'lon': 52.810},
-                "Al Faqa'": {'lat': 24.733, 'lon': 55.616}
+                "Al Faqa'": {'lat': 24.733, 'lon': 55.616},
+                'Hili': {'lat': 24.283, 'lon': 55.772},
+                'Al Jimi': {'lat': 24.246, 'lon': 55.748},
+                'Al Danah': {'lat': 24.488, 'lon': 54.361},
+                'Al Zahiyah': {'lat': 24.494, 'lon': 54.372},
+                'Madinat Zayed': {'lat': 23.655, 'lon': 53.704},
+                'Shakhbout City': {'lat': 24.397, 'lon': 54.636},
+                'Nourai Island': {'lat': 24.615, 'lon': 54.481}
             }
             map_df = df.groupby('District').agg(Median_Rate=('Rate (AED per SQM)', 'median'), Transactions=('Rate (AED per SQM)', 'count')).reset_index()
             map_df['lat'] = map_df['District'].map(lambda x: coord_mapping.get(x, {'lat': 24.4539})['lat'])
