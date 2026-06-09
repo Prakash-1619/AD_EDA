@@ -31,7 +31,7 @@ def load_data():
             'Property Sold Area (SQM)': np.random.exponential(scale=100, size=10000) + 20,
             'Property Sale Price (AED)': np.random.exponential(scale=1500000, size=10000) + 500000,
         })
-        # Introduce some mock null values for demonstration if actual file isn't loaded
+        # Introduce some mock null values for demonstration
         df.loc[df.sample(frac=0.1).index, 'Property Sold Area (SQM)'] = np.nan
         df.loc[df.sample(frac=0.05).index, 'District'] = np.nan
         
@@ -48,13 +48,36 @@ num_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
 cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
 filter_columns = [col for col in cat_cols if col not in ['Sale Application Date', 'YearMonth']]
 
+st.sidebar.title("🛠️ Settings & Filters")
+
+# ==========================================
+# SIDEBAR: DATE FILTER (NEW)
+# ==========================================
+st.sidebar.subheader("📅 Time Frame Filter")
+min_date = df_raw['Sale Application Date'].min().date()
+max_date = df_raw['Sale Application Date'].max().date()
+
+# Streamlit date_input returns a tuple of selected dates
+selected_dates = st.sidebar.date_input(
+    "Select Date Range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Apply the date filter immediately so all subsequent outliers/dropdowns use this time frame
+if len(selected_dates) == 2:
+    start_date, end_date = selected_dates
+    df = df[(df['Sale Application Date'].dt.date >= start_date) & (df['Sale Application Date'].dt.date <= end_date)]
+elif len(selected_dates) == 1:
+    start_date = selected_dates[0]
+    df = df[df['Sale Application Date'].dt.date >= start_date]
+
 # ==========================================
 # SIDEBAR: DYNAMIC OUTLIERS
 # ==========================================
-st.sidebar.title("🛠️ Settings & Filters")
 st.sidebar.subheader("1. Outlier Configuration")
 
-# Choose when to apply outliers
 outlier_scope = st.sidebar.radio(
     "Apply Outliers To:", 
     ["None (Keep All Data)", "Overall Data (Before Filters)", "Filtered Data (After Filters)"],
@@ -70,7 +93,6 @@ for col in num_cols:
             lower, upper = st.slider(f"Percentile Range", 0.0, 100.0, (1.0, 99.0), 0.5, key=f"slider_{col}")
             outlier_bounds[col] = (lower / 100.0, upper / 100.0)
 
-# Helper function to apply outlier logic
 def apply_outliers(data):
     d = data.copy()
     for col, (low, high) in outlier_bounds.items():
@@ -79,7 +101,6 @@ def apply_outliers(data):
         d = d[(d[col] >= l_val) & (d[col] <= h_val)]
     return d
 
-# Apply BEFORE filters if selected
 if outlier_scope == "Overall Data (Before Filters)":
     df = apply_outliers(df)
 
@@ -93,7 +114,6 @@ for col in filter_columns:
     if selected_values:
         df = df[df[col].astype(str).isin(selected_values)]
 
-# Apply AFTER filters if selected
 if outlier_scope == "Filtered Data (After Filters)":
     df = apply_outliers(df)
 
@@ -106,6 +126,7 @@ st.markdown("Comprehensive insights into property transactions, trends, and dist
 
 # Top KPIs
 if not df.empty:
+    # Row 1 Metrics: Core Stats
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Transactions", f"{len(df):,}")
     if 'Rate (AED per SQM)' in df.columns:
@@ -114,12 +135,20 @@ if not df.empty:
         col3.metric("Median Area (SQM)", f"{df['Property Sold Area (SQM)'].median():,.0f}")
     if 'Property Sale Price (AED)' in df.columns:
         col4.metric("Total Value (AED)", f"{df['Property Sale Price (AED)'].sum() / 1e9:,.2f} B")
+        
+    # Row 2 Metrics: Time Frame Boundaries (NEW)
+    d_col1, d_col2, d_col3, d_col4 = st.columns(4)
+    if 'Sale Application Date' in df.columns:
+        first_tx = df['Sale Application Date'].min().strftime('%d %b %Y')
+        last_tx = df['Sale Application Date'].max().strftime('%d %b %Y')
+        d_col1.metric("🗓️ First Recorded Sale", first_tx)
+        d_col2.metric("⏱️ Latest Recorded Sale", last_tx)
 else:
     st.warning("⚠️ No data matches the current filter criteria. Please adjust your filters.")
 
 # --- Tabs ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "📈 Trends", "📊 Distributions", "🔗 Relationships", "🗺️ District Map", "🧩 Correlations", "❓ Null Values", "🕒 Recent Transactions", "📋 Data & Summary"
+    "📈 Trends", "📊 Distributions", "🔗 Relationships", "🗺️ District Map", "🧩 Correlations", "❓ Null Values", "🕒 First Transactions", "📋 Data & Summary"
 ])
 
 if not df.empty:
@@ -274,13 +303,12 @@ if not df.empty:
             st.info("Not enough numerical columns to generate a correlation matrix.")
 
     # ==========================================
-    # TAB 6: NULL VALUES (New Tab)
+    # TAB 6: NULL VALUES
     # ==========================================
     with tab6:
         st.subheader("Missing (Null) Values Analysis")
         st.markdown("This tab displays the percentage and count of missing values across all columns for the **currently filtered dataset**.")
         
-        # Calculate nulls
         null_counts = df.isnull().sum().reset_index()
         null_counts.columns = ['Column', 'Missing Count']
         null_counts['% Missing'] = (null_counts['Missing Count'] / len(df)) * 100
@@ -288,17 +316,11 @@ if not df.empty:
         
         if not null_counts.empty:
             fig_nulls = px.bar(
-                null_counts, 
-                x='Column', 
-                y='% Missing', 
-                text_auto='.2f', 
-                title="Percentage of Missing Values by Column",
-                color='% Missing',
-                color_continuous_scale='Reds'
+                null_counts, x='Column', y='% Missing', text_auto='.2f', 
+                title="Percentage of Missing Values by Column", color='% Missing', color_continuous_scale='Reds'
             )
             fig_nulls.update_layout(height=500)
             st.plotly_chart(fig_nulls, use_container_width=True)
-            
             st.markdown("**Detailed Missing Value Table**")
             st.dataframe(null_counts.style.format({'% Missing': '{:.2f}%'}))
         else:
@@ -311,7 +333,6 @@ if not df.empty:
         st.subheader("First Transactions Analysis")
         st.markdown("Find the **very first (oldest) transaction** ever recorded for every category, and display the top newest ones among them.")
         
-        # Selectors for Category and N-Recent
         rt_col1, rt_col2 = st.columns(2)
         with rt_col1:
             recent_col = st.selectbox("Group by (Category):", filter_columns, index=0)
@@ -319,49 +340,28 @@ if not df.empty:
             limit_n_str = st.selectbox("Show Top N Newest Among Them:", ["5", "10", "20", "50", "All"], index=1)
         
         if 'Sale Application Date' in df.columns:
-            # 1. Sort by Date ASCENDING (Oldest to Newest)
-            # 2. Drop duplicates to keep ONLY the very first (oldest) transaction per category
             first_df = df.sort_values(by='Sale Application Date', ascending=True).drop_duplicates(subset=[recent_col], keep='first')
-            
-            # 3. Sort the resulting "first transactions" by Date DESCENDING (Newest to Oldest) 
-            #    so you can see the most recent of these first transactions.
             first_df = first_df.sort_values(by='Sale Application Date', ascending=False)
             
-            # 4. Apply the Top N limit to the resulting list
             if limit_n_str != "All":
                 first_df = first_df.head(int(limit_n_str))
                 
-            # --- 1. Time Plot Visualization ---
             if 'Rate (AED per SQM)' in df.columns:
                 st.markdown(f"**Timeline of the First-Ever '{recent_col}' Sales**")
-                
-                # Create a scatter plot to show when these first transactions happened
                 fig_first_time = px.scatter(
-                    first_df, 
-                    x='Sale Application Date', 
-                    y='Rate (AED per SQM)', 
-                    color=recent_col,
+                    first_df, x='Sale Application Date', y='Rate (AED per SQM)', color=recent_col,
                     hover_data=['Property Sale Price (AED)', 'Property Sold Area (SQM)', 'Property Type'],
-                    title=f"First Transaction Recorded per {recent_col}",
-                    opacity=0.8
+                    title=f"First Transaction Recorded per {recent_col}", opacity=0.8
                 )
-                
-                # Increase marker size
                 fig_first_time.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
                 st.plotly_chart(fig_first_time, use_container_width=True)
             
-            # --- 2. Data Table ---
             st.markdown(f"**Detailed Data: First transaction details for the selected '{recent_col}'**")
-            
-            # Select columns to display
             display_cols = [recent_col, 'Sale Application Date'] + [c for c in ['Property Sale Price (AED)', 'Rate (AED per SQM)', 'Property Type', 'Sale Sequence'] if c in df.columns]
-            
-            # Show the table
-            st.dataframe(
-                first_df[display_cols].reset_index(drop=True)
-            )
+            st.dataframe(first_df[display_cols].reset_index(drop=True))
         else:
             st.warning("Cannot find 'Sale Application Date' column to calculate the first transactions.")
+
     # ==========================================
     # TAB 8: DATA & SUMMARY
     # ==========================================
