@@ -53,7 +53,7 @@ all_filter_cols = [col for col in cat_cols if col not in ['Sale Application Date
 st.sidebar.title("👁️ Dashboard Mode")
 view_mode = st.sidebar.radio(
     "Select Operating View:",
-    ["Main View 1: Standard Market (Auto-Cleaned)", "Main View 2: Advanced Sandbox (Dynamic)"],
+    ["Abu Dhabi Real Estate", "Dynamic EDA"],
     help="View 1 applies strict default outlier hygiene grouped by asset/type/district. View 2 unlocks dynamic configuration."
 )
 st.sidebar.markdown("---")
@@ -86,12 +86,8 @@ for col in all_filter_cols:
 # ==========================================
 def render_dashboard(df_active, df_raw_ref, num_cols, filter_cols, is_view_1):
     # Top-Line Metrics
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2,  = st.columns(4) # col3, col4
     col1.metric("Total Transactions", f"{len(df_active):,}")
-    if 'Rate (AED per SQM)' in df_active.columns:
-        col2.metric("Median Rate (AED/SQM)", f"{df_active['Rate (AED per SQM)'].median():,.0f}")
-    if 'Property Sold Area (SQM)' in df_active.columns:
-        col3.metric("Median Area (SQM)", f"{df_active['Property Sold Area (SQM)'].median():,.0f}")
     if 'Property Sale Price (AED)' in df_active.columns:
         col4.metric("Total Market Value", f"AED {df_active['Property Sale Price (AED)'].sum() / 1e9:,.2f} B")
 
@@ -123,7 +119,7 @@ def render_dashboard(df_active, df_raw_ref, num_cols, filter_cols, is_view_1):
             })
             st.table(target_framework)
             
-        st.markdown("### Field Level Schema & Structural Sparsity")
+        st.markdown("### Data Summary")
         schema_df = pd.DataFrame({
             "Data Type": df_active.dtypes.astype(str),
             "Non-Null": df_active.notnull().sum(),
@@ -320,7 +316,7 @@ if df_base.empty:
     st.warning("⚠️ No records match your current Date and Sidebar Filters.")
 else:
     if "Main View 1" in view_mode:
-        st.title("🏢 Market Standard Report (View 1)")
+        st.title("Abu Dhabi Real Estate")
         st.markdown("Automated standard hygiene applied: 1% & 99% quantiles removed for precise property evaluation.")
         
         # 1. Define View 1 specific numerical columns
@@ -352,7 +348,7 @@ else:
         render_dashboard(df_active, df_base, num_cols_v1, all_filter_cols, is_view_1=True)
 
     elif "Main View 2" in view_mode:
-        st.title("🏢 Advanced Modeling Sandbox (View 2)")
+        st.title("Dynamic filteration EDA")
         
         # 1. Show Dynamic Outliers Sidebar (Only in View 2)
         st.sidebar.subheader("🛠️ Dynamic Outlier Configuration")
