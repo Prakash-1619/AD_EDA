@@ -31,6 +31,10 @@ def load_data():
             'Property Sold Area (SQM)': np.random.exponential(scale=100, size=10000) + 20,
             'Property Sale Price (AED)': np.random.exponential(scale=1500000, size=10000) + 500000,
         })
+        # Introduce some mock null values for demonstration if actual file isn't loaded
+        df.loc[df.sample(frac=0.1).index, 'Property Sold Area (SQM)'] = np.nan
+        df.loc[df.sample(frac=0.05).index, 'District'] = np.nan
+        
         df['Rate (AED per SQM)'] = df['Property Sale Price (AED)'] / df['Property Sold Area (SQM)']
         df['Sale Application Date'] = pd.to_datetime(df['Sale Application Date'])
         df['YearMonth'] = df['Sale Application Date'].dt.to_period('M').astype(str)
@@ -53,8 +57,9 @@ st.sidebar.subheader("1. Outlier Configuration")
 # Choose when to apply outliers
 outlier_scope = st.sidebar.radio(
     "Apply Outliers To:", 
-    ["Overall Data (Before Filters)", "Filtered Data (After Filters)"],
-    help="Overall applies rules globally. Filtered applies rules only to the data left after your category selections."
+    ["None (Keep All Data)", "Overall Data (Before Filters)", "Filtered Data (After Filters)"],
+    index=0,
+    help="None bypasses outliers. Overall applies rules globally. Filtered applies rules only to the data left after your category selections."
 )
 
 outlier_bounds = {}
@@ -65,27 +70,13 @@ for col in num_cols:
             lower, upper = st.slider(f"Percentile Range", 0.0, 100.0, (1.0, 99.0), 0.5, key=f"slider_{col}")
             outlier_bounds[col] = (lower / 100.0, upper / 100.0)
 
-st.sidebar.markdown("**Categorical Thresholds**")
-min_cat_freq = st.sidebar.number_input(
-    "Minimum Category Frequency", 
-    min_value=1, value=1, 
-    help="Drops categories with fewer than this many transactions."
-)
-
 # Helper function to apply outlier logic
 def apply_outliers(data):
     d = data.copy()
-    # 1. Apply numerical bounds
     for col, (low, high) in outlier_bounds.items():
         l_val = d[col].quantile(low)
         h_val = d[col].quantile(high)
         d = d[(d[col] >= l_val) & (d[col] <= h_val)]
-    # 2. Apply categorical thresholds
-    if min_cat_freq > 1:
-        for col in filter_columns:
-            counts = d[col].value_counts()
-            valid_cats = counts[counts >= min_cat_freq].index
-            d = d[d[col].isin(valid_cats)]
     return d
 
 # Apply BEFORE filters if selected
@@ -127,8 +118,8 @@ else:
     st.warning("⚠️ No data matches the current filter criteria. Please adjust your filters.")
 
 # --- Tabs ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📈 Trends", "📊 Distributions", "🔗 Relationships", "🗺️ District Map", "🧩 Correlations", "📋 Data & Summary"
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📈 Trends", "📊 Distributions", "🔗 Relationships", "🗺️ District Map", "🧩 Correlations", "❓ Null Values", "🕒 Recent Transactions", "📋 Data & Summary"
 ])
 
 if not df.empty:
@@ -165,7 +156,7 @@ if not df.empty:
             st.plotly_chart(fig_trends, use_container_width=True)
 
     # ==========================================
-    # TAB 2: DISTRIBUTIONS (Enhanced)
+    # TAB 2: DISTRIBUTIONS 
     # ==========================================
     with tab2:
         st.subheader("Data Distributions")
@@ -184,7 +175,6 @@ if not df.empty:
                 st.plotly_chart(fig_dist, use_container_width=True)
                 
         else:
-            # Categorical Distribution (Dual Axis Top/Bottom)
             c_col1, c_col2, c_col3, c_col4 = st.columns(4)
             with c_col1:
                 cat_col = st.selectbox("Categorical Column:", filter_columns)
@@ -195,40 +185,26 @@ if not df.empty:
             with c_col4:
                 n_records = st.selectbox("Number of Records (N):", [5, 10, 20, 50, 100], index=1)
 
-            # Aggregate
             cat_agg = df.groupby(cat_col).agg(
                 Count=(cat_col, 'count'),
                 Median_Val=(num_target, 'median')
             ).reset_index()
 
-            # Filter Top or Bottom N
             if sort_type == "Top":
                 cat_agg = cat_agg.nlargest(n_records, 'Count')
             else:
                 cat_agg = cat_agg.nsmallest(n_records, 'Count')
-                # Optional: drop 0 counts for bottoms
                 cat_agg = cat_agg[cat_agg['Count'] > 0]
 
-            # Re-sort to display largest -> smallest nicely
             cat_agg = cat_agg.sort_values(by='Count', ascending=False)
-
             fig_cat = make_subplots(specs=[[{"secondary_y": True}]])
             
-            # Y1: Bars (Count)
-            fig_cat.add_trace(
-                go.Bar(x=cat_agg[cat_col], y=cat_agg['Count'], name="Transaction Count", marker_color='royalblue', opacity=0.7),
-                secondary_y=False,
-            )
-            # Y2: Line (Median Num Val)
-            fig_cat.add_trace(
-                go.Scatter(x=cat_agg[cat_col], y=cat_agg['Median_Val'], name=f"Median {num_target}", mode='lines+markers', line=dict(color='firebrick', width=3)),
-                secondary_y=True,
-            )
+            fig_cat.add_trace(go.Bar(x=cat_agg[cat_col], y=cat_agg['Count'], name="Transaction Count", marker_color='royalblue', opacity=0.7), secondary_y=False)
+            fig_cat.add_trace(go.Scatter(x=cat_agg[cat_col], y=cat_agg['Median_Val'], name=f"Median {num_target}", mode='lines+markers', line=dict(color='firebrick', width=3)), secondary_y=True)
 
             fig_cat.update_layout(title_text=f"{sort_type} {n_records} {cat_col} (Volume vs {num_target})", height=500, hovermode="x unified")
             fig_cat.update_yaxes(title_text="Transaction Count", secondary_y=False)
             fig_cat.update_yaxes(title_text=f"Median {num_target}", secondary_y=True)
-            
             st.plotly_chart(fig_cat, use_container_width=True)
 
     # ==========================================
@@ -285,32 +261,77 @@ if not df.empty:
             st.warning("Map requires 'District' and 'Rate (AED per SQM)' columns.")
 
     # ==========================================
-    # TAB 5: CORRELATIONS (New Tab!)
+    # TAB 5: CORRELATIONS
     # ==========================================
     with tab5:
         st.subheader("Numerical Correlation Matrix")
-        st.markdown("Understand how numerical fields interact. Values closer to **1** or **-1** indicate strong correlations.")
-        
         if len(num_cols) > 1:
-            # Calculate correlation matrix
             corr_matrix = df[num_cols].corr()
-            
-            fig_corr = px.imshow(
-                corr_matrix, 
-                text_auto=".2f", 
-                aspect="auto", 
-                color_continuous_scale='RdBu_r',
-                zmin=-1, zmax=1
-            )
+            fig_corr = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', zmin=-1, zmax=1)
             fig_corr.update_layout(height=600)
             st.plotly_chart(fig_corr, use_container_width=True)
         else:
             st.info("Not enough numerical columns to generate a correlation matrix.")
 
     # ==========================================
-    # TAB 6: DATA & SUMMARY
+    # TAB 6: NULL VALUES (New Tab)
     # ==========================================
     with tab6:
+        st.subheader("Missing (Null) Values Analysis")
+        st.markdown("This tab displays the percentage and count of missing values across all columns for the **currently filtered dataset**.")
+        
+        # Calculate nulls
+        null_counts = df.isnull().sum().reset_index()
+        null_counts.columns = ['Column', 'Missing Count']
+        null_counts['% Missing'] = (null_counts['Missing Count'] / len(df)) * 100
+        null_counts = null_counts[null_counts['Missing Count'] > 0].sort_values(by='% Missing', ascending=False)
+        
+        if not null_counts.empty:
+            fig_nulls = px.bar(
+                null_counts, 
+                x='Column', 
+                y='% Missing', 
+                text_auto='.2f', 
+                title="Percentage of Missing Values by Column",
+                color='% Missing',
+                color_continuous_scale='Reds'
+            )
+            fig_nulls.update_layout(height=500)
+            st.plotly_chart(fig_nulls, use_container_width=True)
+            
+            st.markdown("**Detailed Missing Value Table**")
+            st.dataframe(null_counts.style.format({'% Missing': '{:.2f}%'}))
+        else:
+            st.success("✅ There are zero missing values in the currently selected data slice!")
+
+    # ==========================================
+    # TAB 7: RECENT TRANSACTIONS (New Tab)
+    # ==========================================
+    with tab7:
+        st.subheader("Most Recent Transactions")
+        st.markdown("Identify the latest transaction recorded for specific categories (e.g., the last recorded sale in each District or Community).")
+        
+        recent_col = st.selectbox("Find latest transaction per:", filter_columns, index=0)
+        
+        if 'Sale Application Date' in df.columns:
+            # Sort by Date descending, then drop duplicates keeping the first occurrence (which is the most recent)
+            recent_df = df.sort_values(by='Sale Application Date', ascending=False).drop_duplicates(subset=[recent_col], keep='first')
+            
+            # Formatting the table for readability
+            st.markdown(f"**Latest transaction mapping for every unique {recent_col}**:")
+            
+            # Select columns to display so the table isn't overwhelmingly wide
+            display_cols = [recent_col, 'Sale Application Date'] + [c for c in ['Property Sale Price (AED)', 'Rate (AED per SQM)', 'Property Type', 'Sale Sequence'] if c in df.columns]
+            
+            # Show the table, sorted alphabetically by the selected category for ease of reading
+            st.dataframe(recent_df[display_cols].sort_values(by=recent_col).reset_index(drop=True))
+        else:
+            st.warning("Cannot find 'Sale Application Date' column to calculate recency.")
+
+    # ==========================================
+    # TAB 8: DATA & SUMMARY
+    # ==========================================
+    with tab8:
         st.subheader("Filtered Data Summary")
         st.markdown("**Descriptive Statistics**")
         st.dataframe(df.describe().T.style.format("{:,.2f}"))
