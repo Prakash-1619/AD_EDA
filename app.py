@@ -181,7 +181,7 @@ if not df.empty:
             st.markdown("### Feature Classification Targets")
             target_framework = pd.DataFrame({
                 "Variable Paradigm Role": ["Primary Modeling Target Variable", "Secondary Normalization Target", "Temporal Index Axis"],
-                "Field Column Assigned": ["Property Sale Price (AED)", "Rate (AED per SQM)", "Sale Application Date"],
+                "Field Column Assigned": ["Rate (AED per SQM)","Property Sale Price (AED)",  "Sale Application Date"],
                 "Data Matrix Classification": ["Continuous Numerical Float", "Derived Unit Continuous Float", "Datetime Temporal Stamp"]
             })
             st.table(target_framework)
