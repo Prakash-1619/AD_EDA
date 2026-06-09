@@ -151,7 +151,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 
 if not df.empty:
     # ==========================================
-    # TAB 1: SUMMARY PROFILE (NEW)
+    # TAB 1: SUMMARY PROFILE
     # ==========================================
     with tab1:
         st.subheader("Dataset Architectural Blueprint")
@@ -181,7 +181,7 @@ if not df.empty:
             st.markdown("### Feature Classification Targets")
             target_framework = pd.DataFrame({
                 "Variable Paradigm Role": ["Primary Modeling Target Variable", "Secondary Normalization Target", "Temporal Index Axis"],
-                "Field Column Assigned": ["Rate (AED per SQM)","Property Sale Price (AED)",  "Sale Application Date"],
+                "Field Column Assigned": ["Rate (AED per SQM)", "Property Sale Price (AED)", "Sale Application Date"],
                 "Data Matrix Classification": ["Continuous Numerical Float", "Derived Unit Continuous Float", "Datetime Temporal Stamp"]
             })
             st.table(target_framework)
@@ -197,26 +197,21 @@ if not df.empty:
         st.dataframe(schema_df.style.format({'Sparsity Percent (% Missing)': '{:.2f}%', 'Non-Null Observations': '{:,}', 'Null Records Count': '{:,}', 'Distinct Unique Elements': '{:,}'}))
 
     # ==========================================
-    # TAB 2: TRENDS ENGINE (ENHANCED)
+    # TAB 2: TRENDS ENGINE (WITH GROWTH RATE OPTIONS)
     # ==========================================
     with tab2:
-        st.subheader("Temporal Market Vectors")
+        st.subheader("Temporal Market Vectors & Dynamic Growth Trackers")
         
-        t_cfg1, t_cfg2 = st.columns(2)
+        t_cfg1, t_cfg2, t_cfg3 = st.columns(3)
         with t_cfg1:
-            time_grain = st.selectbox(
-                "Time Frame Granularity Scale:", 
-                options=["Yearly", "Monthly", "Weekly", "Daily"], 
-                index=1
-            )
+            time_grain = st.selectbox("Time Frame Granularity Scale:", options=["Yearly", "Monthly", "Weekly", "Daily"], index=1)
         with t_cfg2:
-            trend_mode = st.radio(
-                "Trend Aggregation Strategy:", 
-                options=["Overall Market (Unified Track)", "By Categorical Feature Breakdown"], 
-                horizontal=True
-            )
+            trend_mode = st.radio("Trend Aggregation Strategy:", options=["Overall Market (Unified Track)", "By Categorical Feature Breakdown"], horizontal=True)
+        with t_cfg3:
+            # Dynamic Growth Tracker Selector Label
+            label_suffix = "YoY" if time_grain == "Yearly" else "MoM" if time_grain == "Monthly" else "WoW" if time_grain == "Weekly" else "DoD"
+            calc_growth = st.checkbox(f"Show Growth Rate Metrics (% {label_suffix})", value=False)
             
-        # Compute corresponding period labels mapping dynamically
         t_df = df.copy()
         if time_grain == "Yearly":
             t_df['Period_Axis'] = t_df['Sale Application Date'].dt.to_period('Y').astype(str)
@@ -236,14 +231,18 @@ if not df.empty:
                     Tx_Count=('Rate (AED per SQM)', 'count')
                 ).reset_index().sort_values(by='Period_Axis')
                 
-                fig_trends.add_trace(
-                    go.Bar(x=trend_agg['Period_Axis'], y=trend_agg['Tx_Count'], name="Volume Count", opacity=0.4, marker_color='grey'),
-                    secondary_y=False
-                )
-                fig_trends.add_trace(
-                    go.Scatter(x=trend_agg['Period_Axis'], y=trend_agg['Median_Rate'], name="Market Median Rate", mode='lines+markers', line=dict(color='indigo', width=3)),
-                    secondary_y=True
-                )
+                if calc_growth:
+                    trend_agg['Rate_Metric'] = trend_agg['Median_Rate'].pct_change() * 100
+                    trend_agg['Count_Metric'] = trend_agg['Tx_Count'].pct_change() * 100
+                    y1_title, y2_title = f"Volume Growth (% {label_suffix})", f"Rate Growth (% {label_suffix})"
+                else:
+                    trend_agg['Rate_Metric'] = trend_agg['Median_Rate']
+                    trend_agg['Count_Metric'] = trend_agg['Tx_Count']
+                    y1_title, y2_title = "Transaction Volume (Count)", "Valuation Index (Median AED/SQM)"
+                
+                fig_trends.add_trace(go.Bar(x=trend_agg['Period_Axis'], y=trend_agg['Count_Metric'], name=y1_title, opacity=0.4, marker_color='grey'), secondary_y=False)
+                fig_trends.add_trace(go.Scatter(x=trend_agg['Period_Axis'], y=trend_agg['Rate_Metric'], name=y2_title, mode='lines+markers', line=dict(color='indigo', width=3)), secondary_y=True)
+                
             else:
                 grouping_options = filter_columns if filter_columns else ["Property Type"]
                 trend_group_col = st.selectbox("Group Sub-Trends Axis By:", grouping_options, index=0)
@@ -253,32 +252,59 @@ if not df.empty:
                     Tx_Count=('Rate (AED per SQM)', 'count')
                 ).reset_index().sort_values(by='Period_Axis')
                 
+                if calc_growth:
+                    trend_agg['Rate_Metric'] = trend_agg.groupby(trend_group_col)['Median_Rate'].pct_change() * 100
+                    trend_agg['Count_Metric'] = trend_agg.groupby(trend_group_col)['Tx_Count'].pct_change() * 100
+                    y1_title, y2_title = f"Volume Growth (% {label_suffix})", f"Rate Growth (% {label_suffix})"
+                else:
+                    trend_agg['Rate_Metric'] = trend_agg['Median_Rate']
+                    trend_agg['Count_Metric'] = trend_agg['Tx_Count']
+                    y1_title, y2_title = "Transaction Volume (Count)", "Valuation Index (Median AED/SQM)"
+                
                 for category in trend_agg[trend_group_col].unique():
                     cat_df = trend_agg[trend_agg[trend_group_col] == category]
-                    fig_trends.add_trace(
-                        go.Bar(x=cat_df['Period_Axis'], y=cat_df['Tx_Count'], name=f"Vol: {category}", opacity=0.5),
-                        secondary_y=False,
-                    )
-                    fig_trends.add_trace(
-                        go.Scatter(x=cat_df['Period_Axis'], y=cat_df['Median_Rate'], name=f"Rate: {category}", mode='lines+markers'),
-                        secondary_y=True,
-                    )
+                    fig_trends.add_trace(go.Bar(x=cat_df['Period_Axis'], y=cat_df['Count_Metric'], name=f"{y1_title.split(' ')[0]}: {category}", opacity=0.5), secondary_y=False)
+                    fig_trends.add_trace(go.Scatter(x=cat_df['Period_Axis'], y=cat_df['Rate_Metric'], name=f"{y2_title.split(' ')[0]}: {category}", mode='lines+markers'), secondary_y=True)
 
-            fig_trends.update_layout(title_text=f"Transaction Volume Metrics vs Valuation Index ({time_grain} Resolution)", barmode='stack', height=600, hovermode="x unified")
-            fig_trends.update_yaxes(title_text="Transaction Volume (Count)", secondary_y=False)
-            fig_trends.update_yaxes(title_text="Valuation Index (Median AED/SQM)", secondary_y=True)
+            fig_trends.update_layout(title_text=f"Market Metric Trajectory Under ({time_grain} Resolution)", barmode='stack', height=600, hovermode="x unified")
+            fig_trends.update_yaxes(title_text=y1_title, secondary_y=False)
+            fig_trends.update_yaxes(title_text=y2_title, secondary_y=True)
             st.plotly_chart(fig_trends, use_container_width=True)
+            
+            st.markdown("### 📋 Aggregated Time-Series Data View")
+            st.dataframe(trend_agg.style.format(precision=2))
 
     # ==========================================
-    # TAB 3: DISTRIBUTIONS
+    # TAB 3: DISTRIBUTIONS (WITH PARETO ANALYSIS CRITERIA)
     # ==========================================
-    with tab2: # Note: st.tabs structural containers maintain separate block assignment matching indices seamlessly
-        pass
     with tab3:
-        st.subheader("Data Distributions")
-        dist_type = st.radio("Choose Distribution Type:", ["Categorical (Categories vs Values)", "Numerical (Histograms)"], horizontal=True)
+        st.subheader("Structural Data Distributions & Concentration Vectors")
+        dist_type = st.radio("Choose Distribution Type:", ["Pareto Analysis", "Categorical (Categories vs Values)", "Numerical (Histograms)"], horizontal=True, index=0)
         
-        if dist_type == "Numerical (Histograms)":
+        if dist_type == "Pareto Analysis":
+            # Direct optimization targets for Pareto
+            pareto_opts = [c for c in ['District', 'Community'] if c in filter_columns] + [c for c in filter_columns if c not in ['District', 'Community']]
+            p_col = st.selectbox("Select Dimension For Pareto Optimization Analysis (80/20 Rule):", options=pareto_opts)
+            
+            p_agg = df[p_col].value_counts().reset_index()
+            p_agg.columns = [p_col, 'Count']
+            p_agg['Cumulative_Percentage'] = (p_agg['Count'].cumsum() / p_agg['Count'].sum()) * 100
+            
+            fig_pareto = make_subplots(specs=[[{"secondary_y": True}]])
+            fig_pareto.add_trace(go.Bar(x=p_agg[p_col], y=p_agg['Count'], name="Transaction Count (Volume)", marker_color='teal'), secondary_y=False)
+            fig_pareto.add_trace(go.Scatter(x=p_agg[p_col], y=p_agg['Cumulative_Percentage'], name="Cumulative Percentage", marker=dict(color='orange'), mode='lines+markers', line=dict(width=3)), secondary_y=True)
+            
+            # Add an 80% line boundary tracker
+            fig_pareto.add_shape(type="line", x0=0, x1=len(p_agg)-1, y0=80, y1=80, line=dict(color="red", width=2, dash="dash"), secondary_y=True)
+            
+            fig_pareto.update_layout(title_text=f"Pareto Concentration Distribution Vector For: {p_col}", height=600, hovermode="x unified")
+            fig_pareto.update_yaxes(title_text="Transaction Record Count", secondary_y=False)
+            fig_pareto.update_yaxes(title_text="Cumulative Impact Percentage (%)", secondary_y=True, range=[0, 105])
+            st.plotly_chart(fig_pareto, use_container_width=True)
+            
+            st.dataframe(p_agg.style.format({'Cumulative_Percentage': '{:.2f}%'}))
+
+        elif dist_type == "Numerical (Histograms)":
             if num_cols:
                 d_col1, d_col2 = st.columns(2)
                 with d_col1:
