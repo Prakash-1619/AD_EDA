@@ -144,9 +144,9 @@ if not df.empty:
 else:
     st.warning("⚠️ No records match current parameters. Soften filter restrictions.")
 
-# Define Re-ordered System Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-    "📋 Summary Profile", "📈 Trends", "📊 Distributions", "🔗 Relationships", "🗺️ District Map", "🧩 Correlations", "❓ Null Footprint", "🕒 First Transactions", "📋 Raw Snapshot"
+# Define 8 Re-ordered System Tabs (Null Footprint Removed)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📋 Summary Profile", "📈 Trends", "📊 Distributions", "🗺️ District Map", "🧩 Correlations", "🕒 First Transactions", "🔗 Relationships", "📋 Raw Snapshot"
 ])
 
 if not df.empty:
@@ -208,7 +208,6 @@ if not df.empty:
         with t_cfg2:
             trend_mode = st.radio("Trend Aggregation Strategy:", options=["Overall Market (Unified Track)", "By Categorical Feature Breakdown"], horizontal=True)
         with t_cfg3:
-            # Dynamic Growth Tracker Selector Label
             label_suffix = "YoY" if time_grain == "Yearly" else "MoM" if time_grain == "Monthly" else "WoW" if time_grain == "Weekly" else "DoD"
             calc_growth = st.checkbox(f"Show Growth Rate Metrics (% {label_suffix})", value=False)
             
@@ -275,14 +274,13 @@ if not df.empty:
             st.dataframe(trend_agg.style.format(precision=2))
 
     # ==========================================
-    # TAB 3: DISTRIBUTIONS (WITH PARETO ANALYSIS CRITERIA)
+    # TAB 3: DISTRIBUTIONS (WITH PARETO)
     # ==========================================
     with tab3:
         st.subheader("Structural Data Distributions & Concentration Vectors")
         dist_type = st.radio("Choose Distribution Type:", ["Pareto Analysis", "Categorical (Categories vs Values)", "Numerical (Histograms)"], horizontal=True, index=0)
         
         if dist_type == "Pareto Analysis":
-            # Direct optimization targets for Pareto
             pareto_opts = [c for c in ['District', 'Community'] if c in filter_columns] + [c for c in filter_columns if c not in ['District', 'Community']]
             p_col = st.selectbox("Select Dimension For Pareto Optimization Analysis (80/20 Rule):", options=pareto_opts)
             
@@ -294,7 +292,6 @@ if not df.empty:
             fig_pareto.add_trace(go.Bar(x=p_agg[p_col], y=p_agg['Count'], name="Transaction Count (Volume)", marker_color='teal'), secondary_y=False)
             fig_pareto.add_trace(go.Scatter(x=p_agg[p_col], y=p_agg['Cumulative_Percentage'], name="Cumulative Percentage", marker=dict(color='orange'), mode='lines+markers', line=dict(width=3)), secondary_y=True)
             
-            # Add an 80% line boundary tracker
             fig_pareto.add_shape(type="line", x0=0, x1=len(p_agg)-1, y0=80, y1=80, line=dict(color="red", width=2, dash="dash"), secondary_y=True)
             
             fig_pareto.update_layout(title_text=f"Pareto Concentration Distribution Vector For: {p_col}", height=600, hovermode="x unified")
@@ -393,26 +390,9 @@ if not df.empty:
             st.plotly_chart(fig_corr, use_container_width=True)
 
     # ==========================================
-    # TAB 6: NULL FOOTPRINT
+    # TAB 6: FIRST TRANSACTIONS
     # ==========================================
     with tab6:
-        st.subheader("Missing (Null) Values Analysis")
-        null_counts = df.isnull().sum().reset_index()
-        null_counts.columns = ['Column', 'Missing Count']
-        null_counts['% Missing'] = (null_counts['Missing Count'] / len(df)) * 100
-        null_counts = null_counts[null_counts['Missing Count'] > 0].sort_values(by='% Missing', ascending=False)
-        
-        if not null_counts.empty:
-            fig_nulls = px.bar(null_counts, x='Column', y='% Missing', text_auto='.2f', color='% Missing', color_continuous_scale='Reds')
-            st.plotly_chart(fig_nulls, use_container_width=True)
-            st.dataframe(null_counts.style.format({'% Missing': '{:.2f}%'}))
-        else:
-            st.success("✅ Clean Dataset Matrix! No missing fields identified in current filter state.")
-
-    # ==========================================
-    # TAB 7: FIRST TRANSACTIONS
-    # ==========================================
-    with tab7:
         st.subheader("First Transactions Analysis")
         rt_col1, rt_col2 = st.columns(2)
         with rt_col1:
@@ -439,9 +419,9 @@ if not df.empty:
             st.dataframe(first_df[display_cols].reset_index(drop=True))
 
     # ==========================================
-    # TAB 8 & 9: RELATIONSHIPS & RAW SNAPSHOT
+    # TAB 7: RELATIONSHIPS
     # ==========================================
-    with tab8:
+    with tab7:
         st.subheader("Multivariate Cross Relationships")
         if num_cols and filter_columns:
             r_col1, r_col2, r_col3, r_col4 = st.columns(4)
@@ -453,7 +433,10 @@ if not df.empty:
             fig_rel = px.scatter(df, x=x_axis, y=y_axis, color=color_dim, size=size_arg, opacity=0.6, height=600)
             st.plotly_chart(fig_rel, use_container_width=True)
 
-    with tab9:
+    # ==========================================
+    # TAB 8: RAW SNAPSHOT
+    # ==========================================
+    with tab8:
         st.subheader("Data Export Matrix Hub")
         st.dataframe(df.describe().T.style.format("{:,.2f}"))
         st.dataframe(df.head(1000))
